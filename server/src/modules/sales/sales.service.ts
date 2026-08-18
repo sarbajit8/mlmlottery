@@ -1,0 +1,186 @@
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../lib/prisma.js';
+import { ApiError } from '../../lib/apiError.js';
+import { logActivity } from '../../middleware/auditLog.js';
+import { generateReceiptCode } from '../../lib/codes.js';
+import { round2 } from '../../lib/money.js';
+import { buildReceiptWaLink } from '../../lib/waLink.js';
+import { computeCommissionsForSale } from '../mlm/commission.engine.js';
+
+export interface CreateSaleInput {
+  ticketIds: number[];
+  customer: { name: string; mobile: string; whatsapp?: string; email?: string };
+}
+
+export async function createSale(input: CreateSaleInput, agentId: number) {
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const tickets = await tx.ticket.findMany({
+        where: { id: { in: input.ticketIds } },
+        include: { batch: { select: { status: true } }, drawSlot: { select: { id: true, name: true } } },
+      });
+
+      if (tickets.length !== input.ticketIds.length) {
+        throw ApiError.badRequest('One or more selected tickets do not exist');
+      }
+
+      const notAvailable = tickets.filter((t) => t.status !== 'AVAILABLE');
+      if (notAvailable.length > 0) {
+        throw ApiError.conflict('Some selected tickets are no longer available', {
+          ticketNumbers: notAvailable.map((t) => t.ticketNumber),
+        });
+      }
+
+      if (tickets.some((t) => t.batch.status === 'LOCKED')) {
+        throw ApiError.conflict('One or more selected tickets belong to a locked batch');
+      }
+
+      const drawSlotId = tickets[0].drawSlotId;
+      const drawDate = tickets[0].drawDate;
+      if (tickets.some((t) => t.drawSlotId !== drawSlotId || t.drawDate.getTime() !== drawDate.getTime())) {
+        throw ApiError.badRequest('All tickets in a single sale must belong to the same draw date and slot');
+      }
+
+      let customer = await tx.customer.findUnique({
+        where: { createdByAgentId_mobile: { createdByAgentId: agentId, mobile: input.customer.mobile } },
+      });
+      if (!customer) {
+        customer = await tx.customer.create({
+          data: { name: input.customer.name, mobile: input.customer.mobile, whatsapp: input.customer.whatsapp, email: input.customer.email, createdByAgentId: agentId },
+        });
+      } else {
+        customer = await tx.customer.update({
+          where: { id: customer.id },
+          data: {
+            name: input.customer.name,
+            whatsapp: input.customer.whatsapp ?? customer.whatsapp,
+            email: input.customer.email ?? customer.email,
+          },
+        });
+      }
+
+      const totalSemValue = round2(tickets.reduce((sum, t) => sum.plus(t.semValue), new Prisma.Decimal(0)));
+      const totalAmount = round2(tickets.reduce((sum, t) => sum.plus(t.price), new Prisma.Decimal(0)));
+
+      const receipt = await tx.receipt.create({
+        data: {
+          receiptCode: generateReceiptCode(),
+          agentId,
+          customerId: customer.id,
+          drawSlotId,
+          drawDate,
+          totalTickets: tickets.length,
+          totalSemValue,
+          totalAmount,
+        },
+      });
+
+      // Guarded conditional update — the race-safe double-sell guard. See sales module notes.
+      const updateResult = await tx.ticket.updateMany({
+        where: { id: { in: input.ticketIds }, status: 'AVAILABLE' },
+        data: { status: 'SOLD', soldByAgentId: agentId, soldToCustomerId: customer.id, soldAt: new Date(), receiptId: receipt.id },
+      });
+
+      if (updateResult.count !== input.ticketIds.length) {
+        throw ApiError.conflict('One or more of these tickets were just sold by someone else. Please refresh and try again.');
+      }
+
+      const commissions = await computeCommissionsForSale(tx, {
+        sellingAgentId: agentId,
+        receiptId: receipt.id,
+        tickets: tickets.map((t) => ({ id: t.id, semValue: t.semValue })),
+      });
+
+      if (commissions.ledgerRows.length > 0) {
+        await tx.commissionLedger.createMany({ data: commissions.ledgerRows });
+      }
+
+      if (commissions.walletCredits.size > 0) {
+        const walletTxns: Prisma.WalletTransactionCreateManyInput[] = [];
+        for (const [uplineAgentId, amount] of commissions.walletCredits) {
+          const updatedUpline = await tx.user.update({
+            where: { id: uplineAgentId },
+            data: { walletBalance: { increment: amount } },
+          });
+          walletTxns.push({
+            userId: uplineAgentId,
+            type: 'COMMISSION',
+            amount,
+            balanceAfter: updatedUpline.walletBalance,
+            refId: receipt.receiptCode,
+            status: 'COMPLETED',
+          });
+        }
+        await tx.walletTransaction.createMany({ data: walletTxns });
+      }
+
+      await logActivity(tx, {
+        actorId: agentId,
+        action: 'SALE_CREATE',
+        entityType: 'Receipt',
+        entityId: receipt.id,
+        metadata: { totalTickets: tickets.length, totalAmount: totalAmount.toString() },
+      });
+
+      return {
+        receipt,
+        customer,
+        drawSlotName: tickets[0].drawSlot.name,
+        ticketNumbers: tickets.map((t) => t.ticketNumber).sort(),
+      };
+    },
+    { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 20000 },
+  );
+
+  const waLink = result.customer.whatsapp
+    ? buildReceiptWaLink({
+        whatsapp: result.customer.whatsapp,
+        customerName: result.customer.name,
+        receiptCode: result.receipt.receiptCode,
+        drawSlotName: result.drawSlotName,
+        drawDate: result.receipt.drawDate.toISOString().slice(0, 10),
+        ticketNumbers: result.ticketNumbers,
+        totalAmount: result.receipt.totalAmount.toNumber(),
+      })
+    : null;
+
+  return { ...result, waLink };
+}
+
+export interface ListSalesQuery {
+  from?: Date;
+  to?: Date;
+  agentId?: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function listSales(query: ListSalesQuery, requester: { id: number; role: string }) {
+  const isAdmin = requester.role === 'SUPER_ADMIN';
+  const where: Prisma.ReceiptWhereInput = {
+    agentId: isAdmin ? query.agentId : requester.id,
+    createdAt: query.from || query.to ? { gte: query.from, lte: query.to } : undefined,
+  };
+
+  const [items, total] = await Promise.all([
+    prisma.receipt.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+      include: { agent: { select: { id: true, name: true } }, customer: true, drawSlot: true },
+    }),
+    prisma.receipt.count({ where }),
+  ]);
+
+  return { items, total, page: query.page, pageSize: query.pageSize };
+}
+
+export async function getReceipt(id: number) {
+  const receipt = await prisma.receipt.findUnique({
+    where: { id },
+    include: { agent: { select: { id: true, name: true } }, customer: true, drawSlot: true, tickets: true },
+  });
+  if (!receipt) throw ApiError.notFound('Receipt not found');
+  return receipt;
+}

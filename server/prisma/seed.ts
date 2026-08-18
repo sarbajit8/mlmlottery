@@ -1,0 +1,131 @@
+import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+
+const prisma = new PrismaClient();
+
+async function hash(pw: string) {
+  return bcrypt.hash(pw, 10);
+}
+
+async function main() {
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@mlmlottery.local';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345';
+
+  const admin = await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {},
+    create: {
+      name: 'Super Admin',
+      email: adminEmail,
+      mobile: '9999999999',
+      passwordHash: await hash(adminPassword),
+      role: 'SUPER_ADMIN',
+      referralCode: 'ADMIN001',
+      status: 'ACTIVE',
+      isCompanyWallet: true,
+    },
+  });
+
+  const existingSettings = await prisma.mlmSettings.findFirst({ where: { effectiveTo: null } });
+  if (!existingSettings) {
+    await prisma.mlmSettings.create({
+      data: {
+        maxLevels: 5,
+        commissionBase: 'SEM_VALUE',
+        payoutMode: 'INSTANT',
+        minPayoutThreshold: 0,
+        shortfallPolicy: 'ROLLUP_TO_ADMIN',
+        levelPercentages: {
+          create: [
+            { levelNumber: 1, percentage: 10 },
+            { levelNumber: 2, percentage: 5 },
+            { levelNumber: 3, percentage: 3 },
+            { levelNumber: 4, percentage: 2 },
+            { levelNumber: 5, percentage: 1 },
+          ],
+        },
+      },
+    });
+    console.log('Seeded default MLM settings (5 levels: 10/5/3/2/1%)');
+  }
+
+  const seriesDefs = [
+    { name: '3CM', multiplier: 3, basePrice: 10 },
+    { name: '5CM', multiplier: 5, basePrice: 10 },
+    { name: '10CM', multiplier: 10, basePrice: 10 },
+  ];
+  for (const s of seriesDefs) {
+    const existing = await prisma.series.findFirst({ where: { name: s.name } });
+    if (!existing) await prisma.series.create({ data: { ...s, status: 'ACTIVE' } });
+  }
+
+  const slotDefs = [
+    { name: '1 PM Draw', salesOpenTime: '10:00', drawCloseTime: '13:00' },
+    { name: '6 PM Draw', salesOpenTime: '14:00', drawCloseTime: '18:00' },
+    { name: '8 PM Draw', salesOpenTime: '18:30', drawCloseTime: '20:00' },
+  ];
+  for (const s of slotDefs) {
+    const existing = await prisma.drawSlot.findFirst({ where: { name: s.name } });
+    if (!existing) {
+      const [oh, om] = s.salesOpenTime.split(':').map(Number);
+      const [ch, cm] = s.drawCloseTime.split(':').map(Number);
+      await prisma.drawSlot.create({
+        data: {
+          name: s.name,
+          salesOpenTime: new Date(Date.UTC(1970, 0, 1, oh, om)),
+          drawCloseTime: new Date(Date.UTC(1970, 0, 1, ch, cm)),
+          isActive: true,
+        },
+      });
+    }
+  }
+
+  // A demo 2-deep agent chain (Agent -> Sub-Agent) under the Super Admin, so the Sell Tickets
+  // flow and multi-level commission/MLM tree view have something to exercise immediately.
+  const demoPassword = await hash('Demo@12345');
+
+  const agent = await prisma.user.upsert({
+    where: { email: 'agent@mlmlottery.local' },
+    update: {},
+    create: {
+      name: 'Demo Agent',
+      email: 'agent@mlmlottery.local',
+      mobile: '9000000001',
+      passwordHash: demoPassword,
+      role: 'AGENT',
+      sponsorId: admin.id,
+      referralCode: 'AGT00001',
+      status: 'ACTIVE',
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: 'subagent@mlmlottery.local' },
+    update: {},
+    create: {
+      name: 'Demo Sub-Agent',
+      email: 'subagent@mlmlottery.local',
+      mobile: '9000000002',
+      passwordHash: demoPassword,
+      role: 'AGENT',
+      sponsorId: agent.id,
+      referralCode: 'AGT00002',
+      status: 'ACTIVE',
+    },
+  });
+
+  console.log('\nSeed complete. Login credentials:');
+  console.log(`  Super Admin:    ${adminEmail} / ${adminPassword}`);
+  console.log(`  Demo Agent:     agent@mlmlottery.local / Demo@12345`);
+  console.log(`  Demo Sub-Agent: subagent@mlmlottery.local / Demo@12345 (recruited by Demo Agent)`);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
