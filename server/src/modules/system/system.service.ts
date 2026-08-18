@@ -48,6 +48,15 @@ export async function getAppSetting(key: string) {
   return prisma.appSetting.findUnique({ where: { key } });
 }
 
+const DEFAULT_COMPANY_NAME = 'Bhutan Cherapunji Lottery';
+
+/** Unauthenticated-safe subset of settings — shown on the public landing/login pages and every ticket. */
+export async function getPublicSettings() {
+  const setting = await prisma.appSetting.findUnique({ where: { key: 'companyName' } });
+  const companyName = typeof setting?.value === 'string' && setting.value.trim() ? setting.value.trim() : DEFAULT_COMPANY_NAME;
+  return { companyName };
+}
+
 export async function listAppSettings() {
   return prisma.appSetting.findMany();
 }

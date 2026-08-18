@@ -1,7 +1,7 @@
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDate } from '@/utils/format';
-import { IconCheck, IconWhatsapp } from '@/components/ui/icons';
+import { IconCheck, IconDownload, IconWhatsapp } from '@/components/ui/icons';
 import type { SaleResult } from '@/types/api';
 
 export function ReceiptModal({ sale, onClose }: { sale: SaleResult; onClose: () => void }) {
@@ -39,7 +39,13 @@ export function ReceiptModal({ sale, onClose }: { sale: SaleResult; onClose: () 
         </div>
       )}
 
-      <div className="mt-5 flex gap-2">
+      <a href={`/agent/receipts/${sale.receipt.id}/print`} target="_blank" rel="noreferrer" className="mt-5 block">
+        <Button variant="secondary" accent="emerald" className="w-full" icon={<IconDownload className="h-4 w-4" />}>
+          Print / Download Tickets
+        </Button>
+      </a>
+
+      <div className="mt-2 flex gap-2">
         {sale.waLink ? (
           <a href={sale.waLink} target="_blank" rel="noreferrer" className="flex-1">
             <Button accent="emerald" className="w-full" icon={<IconWhatsapp className="h-4 w-4" />}>

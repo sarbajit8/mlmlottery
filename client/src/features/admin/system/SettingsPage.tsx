@@ -9,7 +9,7 @@ import { FormField } from '@/components/ui/FormField';
 import { toast } from '@/store/toastStore';
 
 const FIELDS = [
-  { key: 'companyName', label: 'Company Name', placeholder: 'Bhutan Cherapunji Lottery' },
+  { key: 'companyName', label: 'Website / Company Name', placeholder: 'Bhutan Cherapunji Lottery', hint: 'Shown across the website — landing page, login, sidebars — and on every printed ticket.' },
   { key: 'supportWhatsapp', label: 'Support WhatsApp Number', placeholder: '+975...' },
   { key: 'supportEmail', label: 'Support Email', placeholder: 'support@example.com' },
 ];
@@ -28,8 +28,9 @@ export function SettingsPage() {
 
   const saveMut = useMutation({
     mutationFn: (key: string) => systemApi.upsertSetting(key, values[key] ?? ''),
-    onSuccess: () => {
+    onSuccess: (_data, key) => {
       qc.invalidateQueries({ queryKey: ['app-settings'] });
+      if (key === 'companyName') qc.invalidateQueries({ queryKey: ['public-settings'] });
       toast.success('Setting saved');
     },
   });
@@ -43,7 +44,7 @@ export function SettingsPage() {
         </CardHeader>
         <CardBody className="space-y-4">
           {FIELDS.map((f) => (
-            <FormField key={f.key} label={f.label}>
+            <FormField key={f.key} label={f.label} hint={f.hint}>
               <div className="flex gap-2">
                 <Input placeholder={f.placeholder} value={values[f.key] ?? ''} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
                 <Button size="sm" loading={saveMut.isPending} onClick={() => saveMut.mutate(f.key)}>

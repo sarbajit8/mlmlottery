@@ -13,6 +13,10 @@ export async function listAppSettingsHandler(_req: Request, res: Response) {
   res.json(await service.listAppSettings());
 }
 
+export async function publicSettingsHandler(_req: Request, res: Response) {
+  res.json(await service.getPublicSettings());
+}
+
 export async function upsertAppSettingHandler(req: Request, res: Response) {
   const key = String(req.params.key);
   res.json(await service.upsertAppSetting(key, req.body.value));

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { apiErrorMessage } from '@/api/axiosClient';
+import { useSiteName } from '@/hooks/useSiteName';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
 import { IconCheck } from '@/components/ui/icons';
 
 export function JoinPage() {
+  const { initials } = useSiteName();
   const [params] = useSearchParams();
   const [form, setForm] = useState({ name: '', email: '', mobile: '', whatsapp: '', password: '', referralCode: params.get('ref') ?? '' });
   const [loading, setLoading] = useState(false);
@@ -52,7 +54,7 @@ export function JoinPage() {
       <div className="w-full max-w-sm animate-fade-in">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-lg font-bold text-neutral-950 shadow-lg shadow-emerald-500/25">
-            BC
+            {initials}
           </div>
           <h1 className="text-lg font-semibold text-slate-50">Join as an Agent</h1>
           <p className="mt-1 text-xs text-slate-500">Create your agent account — approval from an admin is required before you can log in.</p>

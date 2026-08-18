@@ -34,6 +34,7 @@ import { MyReportsPage } from '@/features/agent/reports/MyReportsPage';
 import { MyCommissionsPage } from '@/features/agent/commissions/MyCommissionsPage';
 import { ResultsPage } from '@/features/agent/results/ResultsPage';
 import { MyWinnersPage } from '@/features/agent/results/MyWinnersPage';
+import { TicketPrintPage } from '@/features/agent/receipts/TicketPrintPage';
 
 export function App() {
   return (
@@ -68,6 +69,7 @@ export function App() {
           </Route>
 
           <Route element={<AgentOnlyRoute />}>
+            <Route path="/agent/receipts/:id/print" element={<TicketPrintPage />} />
             <Route element={<AgentLayout />}>
               <Route path="/agent" element={<AgentDashboardPage />} />
               <Route path="/agent/sell" element={<SellTicketsPage />} />

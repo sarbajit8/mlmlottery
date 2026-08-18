@@ -208,17 +208,20 @@ export async function listSales(query: ListSalesQuery, requester: { id: number; 
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
 
-export async function getReceipt(id: number) {
+export async function getReceipt(id: number, requester: { id: number; role: string }) {
   const receipt = await prisma.receipt.findUnique({
     where: { id },
     include: {
       agent: { select: { id: true, name: true } },
       customer: true,
       drawSlot: true,
-      tickets: true,
+      tickets: { include: { series: { select: { id: true, name: true, multiplier: true } } } },
       paymentMethod: { select: { id: true, label: true, upiId: true } },
     },
   });
   if (!receipt) throw ApiError.notFound('Receipt not found');
+  if (requester.role !== 'SUPER_ADMIN' && receipt.agentId !== requester.id) {
+    throw ApiError.forbidden('You do not have access to this receipt');
+  }
   return receipt;
 }

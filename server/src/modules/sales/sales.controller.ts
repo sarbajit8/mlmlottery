@@ -13,6 +13,7 @@ export async function listSalesHandler(req: Request, res: Response) {
 }
 
 export async function getReceiptHandler(req: Request, res: Response) {
+  if (!req.user) throw ApiError.unauthorized();
   const { id } = req.params as unknown as { id: number };
-  res.json(await service.getReceipt(id));
+  res.json(await service.getReceipt(id, req.user));
 }

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, formatDateTime } from '@/utils/format';
 import { exportRowsAsCsv } from '@/utils/csvClient';
-import { IconDownload } from '@/components/ui/icons';
+import { IconDownload, IconTicket } from '@/components/ui/icons';
 import type { Receipt } from '@/types/api';
 
 export function MyReportsPage() {
@@ -33,6 +33,18 @@ export function MyReportsPage() {
     { key: 'sem', header: 'Total SEM', render: (r) => formatCurrency(r.totalSemValue) },
     { key: 'amount', header: 'Amount', render: (r) => <span className="font-semibold text-emerald-300">{formatCurrency(r.totalAmount)}</span> },
     { key: 'txn', header: 'Transaction ID', render: (r) => <span className="font-mono text-xs text-slate-400">{r.transactionId}</span> },
+    {
+      key: 'actions',
+      header: '',
+      className: 'text-right',
+      render: (r) => (
+        <a href={`/agent/receipts/${r.id}/print`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="secondary" accent="emerald" icon={<IconTicket className="h-3.5 w-3.5" />}>
+            Print
+          </Button>
+        </a>
+      ),
+    },
   ];
 
   return (

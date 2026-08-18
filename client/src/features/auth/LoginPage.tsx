@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authApi } from '@/api/auth';
 import { apiErrorMessage } from '@/api/axiosClient';
 import { useAuthStore, isAdminPanelRole } from '@/store/authStore';
+import { useSiteName } from '@/hooks/useSiteName';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { FormField } from '@/components/ui/FormField';
@@ -11,6 +12,7 @@ import { toast } from '@/store/toastStore';
 export function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const { companyName, initials } = useSiteName();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,9 +42,9 @@ export function LoginPage() {
       <div className="relative z-10 w-full max-w-sm animate-fade-in">
         <div className="mb-8 flex flex-col items-center text-center">
           <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-lg font-bold text-neutral-950 shadow-lg shadow-amber-500/25">
-            BC
+            {initials}
           </div>
-          <h1 className="text-lg font-semibold text-slate-50">Bhutan Cherapunji Lottery</h1>
+          <h1 className="text-lg font-semibold text-slate-50">{companyName}</h1>
           <p className="mt-1 text-xs text-slate-500">Sign in to your Admin or Agent account</p>
         </div>
 

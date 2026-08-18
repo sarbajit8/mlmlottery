@@ -1,6 +1,7 @@
 import { useState, type ComponentType, type SVGProps } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useSiteName } from '@/hooks/useSiteName';
 import { authApi } from '@/api/auth';
 import { cn } from '@/utils/cn';
 import {
@@ -38,14 +39,15 @@ const allItems: NavItem[] = [
 const bottomNavItems = allItems.slice(0, 4);
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+  const { companyName, initials } = useSiteName();
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 text-neutral-950 font-bold shadow-lg shadow-emerald-500/20">
-          BC
+          {initials}
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-100 leading-tight">Bhutan Cherapunji</p>
+          <p className="text-sm font-semibold text-slate-100 leading-tight">{companyName}</p>
           <p className="text-[11px] text-emerald-400/80 leading-tight">Agent Panel</p>
         </div>
       </div>
@@ -74,6 +76,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
 export function AgentLayout() {
   const { user, logout } = useAuth();
+  const { initials } = useSiteName();
   const navigate = useNavigate();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -134,7 +137,7 @@ export function AgentLayout() {
         <header className="flex items-center justify-between border-b border-white/8 bg-neutral-950/80 px-4 py-3 backdrop-blur md:px-6">
           <div className="flex items-center gap-2 md:hidden">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 text-neutral-950 font-bold text-sm">
-              BC
+              {initials}
             </div>
           </div>
           <div className="hidden md:block" />

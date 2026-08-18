@@ -64,3 +64,12 @@ body {
   background-size: 800px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
+
+/* Printed tickets rely on gradients/color for their design — force browsers to include
+   background graphics instead of silently stripping them down to plain black-on-white. */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -7,11 +7,15 @@ import { listActivityQuerySchema, upsertAppSettingSchema } from './system.schema
 import {
   listActivityHandler,
   listAppSettingsHandler,
+  publicSettingsHandler,
   rolesReferenceHandler,
   upsertAppSettingHandler,
 } from './system.controller.js';
 
 export const systemRouter = Router();
+
+// Public — no auth. Read by the landing/login/join pages and every printed ticket, before login.
+systemRouter.get('/public-settings', asyncHandler(publicSettingsHandler));
 
 systemRouter.use(requireAuth);
 

@@ -1,5 +1,6 @@
 import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useSiteName } from '@/hooks/useSiteName';
 import { isAdminPanelRole } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
 import {
@@ -43,13 +44,14 @@ const features = [
 ];
 
 function Nav({ registerHref }: { registerHref: string }) {
+  const { companyName, initials } = useSiteName();
   return (
     <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
       <div className="flex items-center gap-2.5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-sm font-bold text-neutral-950 shadow-lg shadow-amber-500/20">
-          BC
+          {initials}
         </div>
-        <span className="text-sm font-semibold text-slate-100">Bhutan Cherapunji Lottery</span>
+        <span className="text-sm font-semibold text-slate-100">{companyName}</span>
       </div>
       <div className="flex items-center gap-2">
         <Link to="/login">
@@ -67,6 +69,7 @@ function Nav({ registerHref }: { registerHref: string }) {
 
 export function LandingPage() {
   const { isAuthenticated, user } = useAuth();
+  const { companyName } = useSiteName();
   const [params] = useSearchParams();
   const ref = params.get('ref');
   const registerHref = ref ? `/join?ref=${ref}` : '/join';
@@ -167,7 +170,7 @@ export function LandingPage() {
       </section>
 
       <footer className="relative z-10 border-t border-white/8 px-6 py-8 text-center text-xs text-slate-600">
-        © {new Date().getFullYear()} Bhutan Cherapunji Lottery. All rights reserved.
+        © {new Date().getFullYear()} {companyName}. All rights reserved.
       </footer>
     </div>
   );
