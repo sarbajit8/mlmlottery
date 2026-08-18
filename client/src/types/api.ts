@@ -92,6 +92,17 @@ export interface Customer {
   _count?: { tickets: number };
 }
 
+export interface PaymentMethod {
+  id: number;
+  label: string;
+  upiId: string;
+  qrImage: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+  createdBy?: { id: number; name: string };
+}
+
 export interface Receipt {
   id: number;
   receiptCode: string;
@@ -102,11 +113,14 @@ export interface Receipt {
   totalTickets: number;
   totalSemValue: string;
   totalAmount: string;
+  paymentMethodId: number;
+  transactionId: string;
   createdAt: string;
   agent?: { id: number; name: string };
   customer?: Customer;
   drawSlot?: DrawSlot;
   tickets?: Ticket[];
+  paymentMethod?: { id: number; label: string; upiId: string };
 }
 
 export interface SaleResult {

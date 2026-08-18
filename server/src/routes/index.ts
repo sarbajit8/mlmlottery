@@ -11,6 +11,7 @@ import { mlmRouter } from '../modules/mlm/mlm.routes.js';
 import { walletRouter } from '../modules/wallet/wallet.routes.js';
 import { dashboardRouter } from '../modules/dashboard/dashboard.routes.js';
 import { systemRouter } from '../modules/system/system.routes.js';
+import { paymentMethodsRouter } from '../modules/paymentMethods/paymentMethods.routes.js';
 
 export const apiRouter = Router();
 
@@ -28,3 +29,4 @@ apiRouter.use('/mlm', mlmRouter);
 apiRouter.use('/wallet', walletRouter);
 apiRouter.use('/dashboard', dashboardRouter);
 apiRouter.use('/system', systemRouter);
+apiRouter.use('/payment-methods', paymentMethodsRouter);

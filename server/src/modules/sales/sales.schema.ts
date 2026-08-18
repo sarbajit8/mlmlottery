@@ -7,8 +7,9 @@ export const createSaleSchema = z.object({
     name: z.string().min(2),
     mobile: z.string().min(6),
     whatsapp: z.string().optional(),
-    email: z.string().email().optional(),
+    email: z.preprocess((v) => (v === '' ? undefined : v), z.string().email().optional()),
   }),
+  transactionId: z.string().trim().min(4).max(100),
 });
 
 export const listSalesQuerySchema = z.object({

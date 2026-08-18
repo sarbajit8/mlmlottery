@@ -126,6 +126,7 @@ model User {
   withdrawalRequests   WithdrawalRequest[] @relation("WithdrawalUser")
   withdrawalsProcessed WithdrawalRequest[] @relation("WithdrawalProcessedBy")
   auditLogs            AuditLog[]
+  paymentMethodsCreated PaymentMethod[]    @relation("PaymentMethodCreatedBy")
 
   @@index([sponsorId])
   @@index([role])
@@ -246,19 +247,22 @@ model Customer {
 }
 
 model Receipt {
-  id            Int      @id @default(autoincrement())
-  receiptCode   String   @unique @map("receipt_code")
-  agentId       Int      @map("agent_id")
-  agent         User     @relation("ReceiptAgent", fields: [agentId], references: [id])
-  customerId    Int      @map("customer_id")
-  customer      Customer @relation(fields: [customerId], references: [id])
-  drawSlotId    Int      @map("draw_slot_id")
-  drawSlot      DrawSlot @relation(fields: [drawSlotId], references: [id])
-  drawDate      DateTime @db.Date @map("draw_date")
-  totalTickets  Int      @map("total_tickets")
-  totalSemValue Decimal  @db.Decimal(14, 2) @map("total_sem_value")
-  totalAmount   Decimal  @db.Decimal(14, 2) @map("total_amount")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id              Int           @id @default(autoincrement())
+  receiptCode     String        @unique @map("receipt_code")
+  agentId         Int           @map("agent_id")
+  agent           User          @relation("ReceiptAgent", fields: [agentId], references: [id])
+  customerId      Int           @map("customer_id")
+  customer        Customer      @relation(fields: [customerId], references: [id])
+  drawSlotId      Int           @map("draw_slot_id")
+  drawSlot        DrawSlot      @relation(fields: [drawSlotId], references: [id])
+  drawDate        DateTime      @db.Date @map("draw_date")
+  totalTickets    Int           @map("total_tickets")
+  totalSemValue   Decimal       @db.Decimal(14, 2) @map("total_sem_value")
+  totalAmount     Decimal       @db.Decimal(14, 2) @map("total_amount")
+  paymentMethodId Int           @map("payment_method_id")
+  paymentMethod   PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  transactionId   String        @unique @map("transaction_id")
+  createdAt       DateTime      @default(now()) @map("created_at")
 
   tickets          Ticket[]
   commissionLedger CommissionLedger[]
@@ -266,7 +270,27 @@ model Receipt {
   @@index([agentId])
   @@index([customerId])
   @@index([drawSlotId, drawDate])
+  @@index([paymentMethodId])
   @@map("receipts")
+}
+
+// Admin-managed UPI/QR payment targets. Agents pay the active one out-of-band (their own UPI
+// app) and prove it by entering the transaction id/UTR when completing a sale — see Receipt.
+model PaymentMethod {
+  id          Int      @id @default(autoincrement())
+  label       String
+  upiId       String   @map("upi_id")
+  qrImage     String   @db.Text @map("qr_image") // data URI (uploaded QR image) or hosted URL
+  isActive    Boolean  @default(false) @map("is_active")
+  createdById Int      @map("created_by")
+  createdBy   User     @relation("PaymentMethodCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  receipts Receipt[]
+
+  @@index([isActive])
+  @@map("payment_methods")
 }
 
 // A single declared result for one draw occurrence (slot + date). The 1st prize is tied to one

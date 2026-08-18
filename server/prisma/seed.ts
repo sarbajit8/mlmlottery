@@ -115,6 +115,26 @@ async function main() {
     },
   });
 
+  const existingPaymentMethod = await prisma.paymentMethod.findFirst();
+  if (!existingPaymentMethod) {
+    const placeholderQr =
+      'data:image/svg+xml;base64,' +
+      Buffer.from(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="#fff"/><rect x="20" y="20" width="200" height="200" fill="none" stroke="#000" stroke-width="4"/><text x="120" y="110" font-family="sans-serif" font-size="16" text-anchor="middle" fill="#000">Demo UPI QR</text><text x="120" y="135" font-family="sans-serif" font-size="12" text-anchor="middle" fill="#666">Replace in Admin →</text><text x="120" y="152" font-family="sans-serif" font-size="12" text-anchor="middle" fill="#666">Finance → Payment Methods</text></svg>',
+      ).toString('base64');
+
+    await prisma.paymentMethod.create({
+      data: {
+        label: 'Demo Company UPI',
+        upiId: 'mlmlottery@upi',
+        qrImage: placeholderQr,
+        isActive: true,
+        createdById: admin.id,
+      },
+    });
+    console.log('Seeded a demo active payment method (Demo Company UPI) — replace it in Admin → Finance → Payment Methods');
+  }
+
   console.log('\nSeed complete. Login credentials:');
   console.log(`  Super Admin:    ${adminEmail} / ${adminPassword}`);
   console.log(`  Demo Agent:     agent@mlmlottery.local / Demo@12345`);

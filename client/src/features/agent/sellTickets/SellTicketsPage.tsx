@@ -5,6 +5,7 @@ import { seriesApi } from '@/api/series';
 import { ticketsApi } from '@/api/tickets';
 import { customersApi } from '@/api/customers';
 import { salesApi } from '@/api/sales';
+import { paymentMethodsApi } from '@/api/paymentMethods';
 import { apiErrorMessage } from '@/api/axiosClient';
 import { useCartStore } from '@/store/cartStore';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -17,7 +18,7 @@ import { FormField } from '@/components/ui/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ReceiptModal } from './ReceiptModal';
 import { formatCurrency, todayIso } from '@/utils/format';
-import { IconCart, IconSearch, IconTicket, IconX } from '@/components/ui/icons';
+import { IconCart, IconQrCode, IconSearch, IconTicket, IconX } from '@/components/ui/icons';
 import type { SaleResult } from '@/types/api';
 
 export function SellTicketsPage() {
@@ -29,11 +30,26 @@ export function SellTicketsPage() {
 
   const cart = useCartStore();
   const [customer, setCustomer] = useState({ name: '', mobile: '', whatsapp: '', email: '' });
+  const [transactionId, setTransactionId] = useState('');
+  const [copied, setCopied] = useState(false);
   const [saleResult, setSaleResult] = useState<SaleResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: slots } = useQuery({ queryKey: ['draw-slots'], queryFn: drawSlotsApi.list, refetchInterval: 30000 });
   const { data: seriesList } = useQuery({ queryKey: ['series'], queryFn: seriesApi.list });
+  const { data: activePayment, isLoading: paymentLoading } = useQuery({
+    queryKey: ['payment-method-active'],
+    queryFn: paymentMethodsApi.active,
+    retry: false,
+  });
+
+  function copyUpiId() {
+    if (!activePayment) return;
+    navigator.clipboard.writeText(activePayment.upiId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   const openSlots = slots ?? [];
 
@@ -67,11 +83,12 @@ export function SellTicketsPage() {
   const totalAmount = cart.items.reduce((sum, t) => sum + Number(t.price), 0);
 
   const saleMut = useMutation({
-    mutationFn: () => salesApi.create({ ticketIds: cart.items.map((t) => t.id), customer }),
+    mutationFn: () => salesApi.create({ ticketIds: cart.items.map((t) => t.id), customer, transactionId: transactionId.trim() }),
     onSuccess: (result) => {
       setSaleResult(result);
       cart.clear();
       setCustomer({ name: '', mobile: '', whatsapp: '', email: '' });
+      setTransactionId('');
       setError(null);
     },
     onError: (err) => {
@@ -211,16 +228,50 @@ export function SellTicketsPage() {
               </FormField>
             </div>
 
+            {cart.items.length > 0 && (
+              <div className="mt-4 space-y-3 border-t border-white/8 pt-4">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                  <IconQrCode className="h-3.5 w-3.5" /> Pay to Buy Tickets
+                </p>
+
+                {paymentLoading ? (
+                  <p className="text-xs text-slate-500">Loading payment details…</p>
+                ) : !activePayment ? (
+                  <p className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                    No payment method is configured yet. Contact your admin before selling tickets.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 rounded-lg border border-white/8 bg-white/[0.02] p-3">
+                      <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/8 bg-white p-1">
+                        <img src={activePayment.qrImage} alt={`${activePayment.label} QR code`} className="h-full w-full object-contain" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-slate-400">{activePayment.label}</p>
+                        <p className="truncate font-mono text-sm text-slate-100">{activePayment.upiId}</p>
+                        <button type="button" onClick={copyUpiId} className="mt-1 text-[11px] text-emerald-300 hover:text-emerald-200">
+                          {copied ? 'Copied!' : 'Copy UPI ID'}
+                        </button>
+                      </div>
+                    </div>
+                    <FormField label="Transaction ID / UTR Number" required hint="Scan the QR or pay to the UPI ID above, then enter the transaction reference to confirm the sale.">
+                      <Input required value={transactionId} onChange={(e) => setTransactionId(e.target.value)} placeholder="e.g. 123456789012" className="font-mono" />
+                    </FormField>
+                  </>
+                )}
+              </div>
+            )}
+
             {error && <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</p>}
 
             <Button
               accent="emerald"
               className="mt-4 w-full"
-              disabled={cart.items.length === 0 || !customer.mobile || !customer.name}
+              disabled={cart.items.length === 0 || !customer.mobile || !customer.name || !activePayment || !transactionId.trim()}
               loading={saleMut.isPending}
               onClick={() => saleMut.mutate()}
             >
-              Save Sale &amp; Get WhatsApp Link
+              Confirm Payment &amp; Buy Tickets
             </Button>
           </CardBody>
         </Card>

@@ -32,6 +32,13 @@ export function ReceiptModal({ sale, onClose }: { sale: SaleResult; onClose: () 
         <p className="text-xs text-slate-500">{sale.customer.mobile}</p>
       </div>
 
+      {sale.receipt.paymentMethod && (
+        <div className="mt-3 rounded-lg border border-white/8 px-3 py-2.5 text-sm">
+          <p className="text-slate-400">Paid via {sale.receipt.paymentMethod.label}</p>
+          <p className="font-mono text-xs text-slate-300">UTR: {sale.receipt.transactionId}</p>
+        </div>
+      )}
+
       <div className="mt-5 flex gap-2">
         {sale.waLink ? (
           <a href={sale.waLink} target="_blank" rel="noreferrer" className="flex-1">

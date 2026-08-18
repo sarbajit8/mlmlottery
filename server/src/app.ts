@@ -12,7 +12,7 @@ export function createApp() {
   app.set('trust proxy', true); // behind the Apache reverse proxy on :8083
   app.use(helmet());
   app.use(cors());
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '4mb' })); // headroom for base64 payment-QR uploads
   app.use(requestLogger);
 
   app.use('/api', apiRouter);

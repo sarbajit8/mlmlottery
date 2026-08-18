@@ -10,11 +10,49 @@ import { computeCommissionsForSale } from '../mlm/commission.engine.js';
 export interface CreateSaleInput {
   ticketIds: number[];
   customer: { name: string; mobile: string; whatsapp?: string; email?: string };
+  transactionId: string;
 }
 
 export async function createSale(input: CreateSaleInput, agentId: number) {
-  const result = await prisma.$transaction(
+  let result;
+  try {
+    result = await runCreateSale(input, agentId);
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002' && (err.meta?.target as string[] | undefined)?.includes('transaction_id')) {
+      throw ApiError.conflict('This transaction ID has already been used for another sale.');
+    }
+    throw err;
+  }
+
+  const waLink = result.customer.whatsapp
+    ? buildReceiptWaLink({
+        whatsapp: result.customer.whatsapp,
+        customerName: result.customer.name,
+        receiptCode: result.receipt.receiptCode,
+        drawSlotName: result.drawSlotName,
+        drawDate: result.receipt.drawDate.toISOString().slice(0, 10),
+        ticketNumbers: result.ticketNumbers,
+        totalAmount: result.receipt.totalAmount.toNumber(),
+      })
+    : null;
+
+  return { ...result, waLink };
+}
+
+async function runCreateSale(input: CreateSaleInput, agentId: number) {
+  return prisma.$transaction(
     async (tx) => {
+      const activePaymentMethod = await tx.paymentMethod.findFirst({ where: { isActive: true } });
+      if (!activePaymentMethod) {
+        throw ApiError.badRequest('No active payment method is configured. Please contact admin before selling tickets.');
+      }
+
+      const transactionId = input.transactionId.trim();
+      const existingTxn = await tx.receipt.findUnique({ where: { transactionId } });
+      if (existingTxn) {
+        throw ApiError.conflict('This transaction ID has already been used for another sale.');
+      }
+
       const tickets = await tx.ticket.findMany({
         where: { id: { in: input.ticketIds } },
         include: { batch: { select: { status: true } }, drawSlot: { select: { id: true, name: true } } },
@@ -72,7 +110,10 @@ export async function createSale(input: CreateSaleInput, agentId: number) {
           totalTickets: tickets.length,
           totalSemValue,
           totalAmount,
+          paymentMethodId: activePaymentMethod.id,
+          transactionId,
         },
+        include: { paymentMethod: { select: { id: true, label: true, upiId: true } } },
       });
 
       // Guarded conditional update — the race-safe double-sell guard. See sales module notes.
@@ -131,20 +172,6 @@ export async function createSale(input: CreateSaleInput, agentId: number) {
     },
     { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, timeout: 20000 },
   );
-
-  const waLink = result.customer.whatsapp
-    ? buildReceiptWaLink({
-        whatsapp: result.customer.whatsapp,
-        customerName: result.customer.name,
-        receiptCode: result.receipt.receiptCode,
-        drawSlotName: result.drawSlotName,
-        drawDate: result.receipt.drawDate.toISOString().slice(0, 10),
-        ticketNumbers: result.ticketNumbers,
-        totalAmount: result.receipt.totalAmount.toNumber(),
-      })
-    : null;
-
-  return { ...result, waLink };
 }
 
 export interface ListSalesQuery {
@@ -168,7 +195,12 @@ export async function listSales(query: ListSalesQuery, requester: { id: number; 
       orderBy: { createdAt: 'desc' },
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
-      include: { agent: { select: { id: true, name: true } }, customer: true, drawSlot: true },
+      include: {
+        agent: { select: { id: true, name: true } },
+        customer: true,
+        drawSlot: true,
+        paymentMethod: { select: { id: true, label: true, upiId: true } },
+      },
     }),
     prisma.receipt.count({ where }),
   ]);
@@ -179,7 +211,13 @@ export async function listSales(query: ListSalesQuery, requester: { id: number; 
 export async function getReceipt(id: number) {
   const receipt = await prisma.receipt.findUnique({
     where: { id },
-    include: { agent: { select: { id: true, name: true } }, customer: true, drawSlot: true, tickets: true },
+    include: {
+      agent: { select: { id: true, name: true } },
+      customer: true,
+      drawSlot: true,
+      tickets: true,
+      paymentMethod: { select: { id: true, label: true, upiId: true } },
+    },
   });
   if (!receipt) throw ApiError.notFound('Receipt not found');
   return receipt;

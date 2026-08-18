@@ -32,6 +32,7 @@ export function MyReportsPage() {
     { key: 'tickets', header: 'Tickets', render: (r) => r.totalTickets },
     { key: 'sem', header: 'Total SEM', render: (r) => formatCurrency(r.totalSemValue) },
     { key: 'amount', header: 'Amount', render: (r) => <span className="font-semibold text-emerald-300">{formatCurrency(r.totalAmount)}</span> },
+    { key: 'txn', header: 'Transaction ID', render: (r) => <span className="font-mono text-xs text-slate-400">{r.transactionId}</span> },
   ];
 
   return (
@@ -51,8 +52,17 @@ export function MyReportsPage() {
                 data &&
                 exportRowsAsCsv(
                   'my-sales.csv',
-                  ['Receipt', 'Date', 'Slot', 'Customer', 'Tickets', 'Total SEM', 'Amount'],
-                  data.items.map((r) => [r.receiptCode, r.createdAt, r.drawSlot?.name ?? '', r.customer?.name ?? '', r.totalTickets, r.totalSemValue, r.totalAmount]),
+                  ['Receipt', 'Date', 'Slot', 'Customer', 'Tickets', 'Total SEM', 'Amount', 'Transaction ID'],
+                  data.items.map((r) => [
+                    r.receiptCode,
+                    r.createdAt,
+                    r.drawSlot?.name ?? '',
+                    r.customer?.name ?? '',
+                    r.totalTickets,
+                    r.totalSemValue,
+                    r.totalAmount,
+                    r.transactionId,
+                  ]),
                 )
               }
             >

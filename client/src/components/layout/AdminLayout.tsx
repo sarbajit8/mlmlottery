@@ -12,6 +12,7 @@ import {
   IconLogout,
   IconMenu,
   IconNetwork,
+  IconQrCode,
   IconSettings,
   IconTicket,
   IconTrophy,
@@ -58,6 +59,7 @@ const sections: NavSection[] = [
     items: [
       { label: 'Reports', to: '/admin/finance/reports', icon: IconFile },
       { label: 'Wallet / Payouts', to: '/admin/finance/payouts', icon: IconWallet },
+      { label: 'Payment Methods', to: '/admin/finance/payment-methods', icon: IconQrCode },
     ],
   },
   {
